@@ -27,12 +27,24 @@ export default class UploadForm extends Component {
 
   uploadAllFilesAsync = async () => {
     this.setState({ uploadProgress: {}, uploading: true });
-    const promises = this.state.files.map((file) => {
-      return this.sendRequest(file);
-    });
+    const promises = this.state.files
+      .filter((file) => {
+        return this.validFileSize(file) && this.validFileType(file);
+      })
+      .map((file) => {
+        return this.sendRequest(file);
+      });
     try {
       await Promise.all(promises);
-      this.setState({ successfullyUploaded: true, uploading: false });
+      let notAllUploaded = Object.values(this.state.uploadProgress).some(
+        (progress) => {
+          return progress.state !== "done" || progress.percentage !== 100;
+        }
+      );
+      this.setState({
+        successfullyUploaded: !notAllUploaded,
+        uploading: false,
+      });
     } catch (e) {
       // todo: error handling
       console.log(e);
@@ -81,6 +93,7 @@ export default class UploadForm extends Component {
 
       // note: XMLHttpRequest can be replaced with axios, e.g.:
       // axios.post("/api/upload", formData);
+      // but not sure how we will get the progress information then
     });
   };
 
@@ -90,26 +103,37 @@ export default class UploadForm extends Component {
       return (
         <div className="progress-wrapper">
           <Progress progress={uploadProgress ? uploadProgress.percentage : 0} />
-          <img
-            className="check-icon"
-            alt="done"
-            src="done-24px.svg"
-            style={{
-              opacity:
-                uploadProgress && uploadProgress.state === "done" ? 1 : 0.5,
-            }}
-          />
+          {uploadProgress && uploadProgress.state === "done" && (
+            <img className="check-icon" alt="done" src="done-24px.svg" />
+          )}
         </div>
       );
     }
   };
 
   validFileSize = (file) => {
-    let maSize = 200000;
+    console.log(file.size);
+    let maSize = 50000000; // 50MB
     if (file.size > maSize) {
       console.log("file is too large");
+      // return false;
+    }
+    return true;
+  };
+
+  validFileType = (file) => {
+    // allowed types, see https://www.lifewire.com/file-extensions-and-mime-types-3469109
+    const types = [
+      "video/mpeg",
+      "video/mp4",
+      "video/quicktime",
+      "video/x-msvideo",
+    ];
+    if (types.every((type) => file.type !== type)) {
+      console.log(file.type + " is not a supported format\n");
       return false;
     }
+
     return true;
   };
 
